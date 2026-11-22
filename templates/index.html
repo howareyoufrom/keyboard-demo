@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bàn phím QWERTY gõ Telex</title>
+<style>
+:root{
+  --bg:#f1f3ef; --panel:#ffffff; --key:#ffffff; --key-line:#c5cac2; --fn:#e2e6df;
+  --ink:#1c2420; --muted:#667068; --accent:#1d6b58; --accent-ink:#ffffff; --r:8px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#141815; --panel:#1d231f; --key:#29302b; --key-line:#3a443d; --fn:#222924;
+        --ink:#e7ece8; --muted:#97a29a; --accent:#5cc2a5; --accent-ink:#0d1a14;}
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding:1rem;display:flex;justify-content:center}
+main{width:100%;max-width:760px}
+h1{font-size:1.15rem;font-weight:600;margin:0 0 .75rem}
+textarea{width:100%;height:9rem;resize:vertical;padding:.8rem 1rem;font:inherit;font-size:1.25rem;line-height:1.5;
+  background:var(--panel);color:var(--ink);border:1px solid var(--key-line);border-radius:var(--r)}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.bar{display:flex;gap:.5rem;margin:.6rem 0 1rem;align-items:center}
+.bar span{flex:1;color:var(--muted);font-size:.9rem}
+.tool{font:inherit;font-size:.9rem;padding:.35rem .8rem;border-radius:var(--r);border:1px solid var(--key-line);
+  background:var(--panel);color:var(--ink);cursor:pointer}
+.tool.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#kb{background:var(--panel);border:1px solid var(--key-line);border-radius:var(--r);padding:.5rem;
+  display:flex;flex-direction:column;gap:.4rem;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+.row{display:flex;gap:.4rem}
+.row.pad{padding:0 4.5%}
+.key{flex:1;min-width:0;height:3.2rem;font:inherit;font-size:1.2rem;color:var(--ink);background:var(--key);
+  border:1px solid var(--key-line);border-radius:var(--r);cursor:pointer;padding:0}
+.key:active{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.key:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.fn{background:var(--fn);font-size:1rem}
+.shift,.back{flex:1.5}
+.vn{flex:1.4;font-weight:600}
+.enter{flex:1.6}
+.space{flex:5}
+.key.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.key.caps{text-decoration:underline}
+.help{margin-top:1rem;color:var(--muted);font-size:.9rem}
+.help p{margin:.2rem 0}
+.help b{color:var(--ink);font-weight:600}
+.compare{margin-top:1.5rem;padding:1rem;background:var(--panel);border:1px solid var(--key-line);border-radius:var(--r)}
+.compare h2{font-size:1.05rem;margin:0 0 .4rem}
+.compare p{margin:.35rem 0;color:var(--muted);font-size:.9rem}
+.compare input[type="text"]{width:100%;padding:.55rem .7rem;font:inherit;color:var(--ink);background:var(--bg);
+  border:1px solid var(--key-line);border-radius:var(--r)}
+.compare-controls{display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin:.75rem 0}
+.compare-controls label{font-size:.9rem}
+.compare-controls input[type="range"]{vertical-align:middle}
+.comparison-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.75rem;margin-top:.75rem}
+.preview-panel{padding:.75rem;background:var(--bg);border:1px solid var(--key-line);border-radius:var(--r);min-width:0}
+.preview-panel h3{margin:0 0 .5rem;font-size:.95rem}
+.preview-keyboard{display:flex;flex-direction:column;gap:.3rem;user-select:none}
+.preview-row{display:flex;justify-content:center;gap:.25rem}
+.preview-key{min-width:0;flex:1;height:2rem;padding:.1rem;border:1px solid var(--key-line);border-radius:5px;
+  background:var(--panel);color:var(--ink);font:inherit;font-size:.75rem;text-align:center}
+.preview-row:nth-child(2){padding:0 4%}
+.preview-row:nth-child(3){padding:0 12%}
+.preview-key.space-key{flex:5;height:1.5rem;font-size:.65rem}
+.preview-key.pressed{animation:key-tremble 180ms ease-in-out;background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+@keyframes key-tremble{0%,100%{transform:translate(0,0)}25%{transform:translate(2px,-1px)}50%{transform:translate(-2px,1px)}75%{transform:translate(1px,2px)}}
+.preview-state{min-height:1.5rem;margin:.5rem 0;font-size:.8rem;color:var(--muted)}
+.preview-output{min-height:3.5rem;padding:.55rem;background:var(--panel);border:1px solid var(--key-line);border-radius:5px;
+  white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
+</head>
+<body>
+<main>
+  <h1>Bàn phím QWERTY gõ tiếng Việt (Telex)</h1>
+  <textarea id="out" inputmode="none" placeholder="Bấm phím ảo bên dưới hoặc gõ bằng bàn phím máy tính, ví dụ: Vieetj Nam" spellcheck="false"></textarea>
+  <div class="bar">
+    <span id="status"></span>
+    <button class="tool" id="ai-mode" type="button" aria-pressed="true">AI: Bật</button>
+    <button class="tool" id="tremor" type="button" aria-pressed="true">Run tay</button>
+    <button class="tool" id="copy" type="button">Sao chép</button>
+    <button class="tool" id="clear" type="button">Xóa hết</button>
+  </div>
+  <div id="kb" aria-label="Bàn phím ảo"></div>
+  <div class="help">
+    <p><b>Chữ:</b> aa → â · aw → ă · ee → ê · oo → ô · ow → ơ · uw → ư · dd → đ</p>
+    <p><b>Dấu:</b> s sắc · f huyền · r hỏi · x ngã · j nặng · z xóa dấu</p>
+    <p>Gõ lặp lại phím dấu để hủy (ví dụ ass → as). Nút VN/EN bật tắt bộ gõ.</p>
+  </div>
+  <section class="compare" aria-labelledby="compare-title">
+    <h2 id="compare-title">So sánh Baseline và bàn phím tích hợp</h2>
+    <p>Nhập chuỗi Telex sạch người dùng định gõ, ví dụ <b>xin chaof</b>. Cả hai bàn phím sẽ chạy trên cùng một mẫu chạm có thể bị lặp hoặc lệch sang phím bên cạnh.</p>
+    <input id="compare-input" type="text" value="xin chaof" aria-label="Chuỗi Telex sạch cần kiểm thử">
+    <div class="compare-controls">
+      <label for="repeat-rate">Tỷ lệ nhấn lặp mô phỏng: <output id="repeat-value">25%</output></label>
+      <input id="repeat-rate" type="range" min="0" max="100" step="5" value="25">
+      <label for="drift-rate">Tỷ lệ chạm lệch phím: <output id="drift-value">20%</output></label>
+      <input id="drift-rate" type="range" min="0" max="100" step="5" value="20">
+      <button class="tool" id="compare-run" type="button">Chạy so sánh</button>
+    </div>
+    <p>Mô phỏng tạo lần nhấn lặp và dịch điểm chạm theo hàng phím QWERTY; đây không phải mô hình y khoa hay mô phỏng đầy đủ Parkinson.</p>
+    <div class="comparison-grid" aria-live="polite">
+      <section class="preview-panel">
+        <h3>Baseline — nhận trực tiếp các phím nhấn</h3>
+        <div class="preview-keyboard" id="baseline-preview" aria-label="Animation bàn phím Baseline"></div>
+        <p class="preview-state" id="baseline-state">Chưa chạy</p>
+        <div class="preview-output" id="baseline-output" aria-label="Đầu ra Baseline"></div>
+      </section>
+      <section class="preview-panel">
+        <h3>Bàn phím tích hợp — Viterbi + N-gram</h3>
+        <div class="preview-keyboard" id="integrated-preview" aria-label="Animation bàn phím tích hợp"></div>
+        <p class="preview-state" id="integrated-state">Chưa chạy</p>
+        <div class="preview-output" id="integrated-output" aria-label="Đầu ra bàn phím tích hợp"></div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const ta = document.getElementById('out');
+  const V = 'aeiouy';
+  // m: c = mũ (â ê ô), b = trăng (ă), h = râu (ơ ư), s = gạch (đ)
+  const MAP = {
+    a:{'':'a', c:'â', b:'ă'}, e:{'':'e', c:'ê'}, o:{'':'o', c:'ô', h:'ơ'},
+    u:{'':'u', h:'ư'}, i:{'':'i'}, y:{'':'y'}, d:{'':'d', s:'đ'}
+  };
+  const TONES = ['', '\u0301', '\u0300', '\u0309', '\u0303', '\u0323'];
+  const TK = {s:1, f:2, r:3, x:4, j:5};
+  const SHIFT_NUM = {'1':'!','2':'@','3':'#','4':'$','5':'%','6':'^','7':'&','8':'*','9':'(','0':')'};
+
+  let vn = true, shift = 0, W, start, prevLen;
+  let aiMode = true, simulateTremor = true;
+  let touchBuffer = [], nextTouchGroup = 0, aiTimer = null;
+  const reset = () => { W = {L:[], tone:0, locked:false}; start = -1; prevLen = 0; };
+  reset();
+
+  const isV = l => V.includes(l.b);
+  const glyph = l => {
+    const c = (MAP[l.b] && MAP[l.b][l.m]) || l.b;
+    return l.u ? c.toUpperCase() : c;
+  };
+
+  // Vị trí đặt dấu thanh (kiểu cũ: hòa, thủy)
+  function tonePos(L) {
+    let idx = [];
+    L.forEach((l, i) => { if (isV(l)) idx.push(i); });
+    if (L.length > 1 && L[0].b === 'q' && L[1].b === 'u') idx = idx.filter(i => i !== 1);
+    else if (L.length > 2 && L[0].b === 'g' && L[1].b === 'i' && idx.length > 1) idx = idx.filter(i => i !== 1);
+    if (!idx.length) return -1;
+    const modded = idx.filter(i => L[i].m);
+    if (modded.length) return modded[modded.length - 1];
+    if (idx.length === 1) return idx[0];
+    if (idx.length >= 3) return idx[1];
+    const hasFinal = idx[1] < L.length - 1;
+    return hasFinal ? idx[1] : idx[0];
+  }
+
+  function render() {
+    const p = W.tone ? tonePos(W.L) : -1;
+    return W.L.map((l, i) => {
+      let c = glyph(l);
+      if (i === p) c = (c + TONES[W.tone]).normalize('NFC');
+      return c;
+    }).join('');
+  }
+
+  // Xử lý một phím chữ theo quy tắc Telex
+  function feed(key) {
+    const k = key.toLowerCase(), up = key !== k, L = W.L;
+    const push = (b, m = '') => L.push({b, m, u: up});
+    if (W.locked) { push(k); return; }
+    const last = L[L.length - 1];
+
+    // dấu thanh
+    if ((k in TK || k === 'z') && L.some(isV)) {
+      if (k === 'z') { if (W.tone) W.tone = 0; else push(k); return; }
+      if (W.tone === TK[k]) { W.tone = 0; W.locked = true; push(k); return; }
+      W.tone = TK[k]; return;
+    }
+    // dd -> đ
+    if (k === 'd' && last && last.b === 'd') {
+      if (last.m === 's') { last.m = ''; W.locked = true; push('d'); return; }
+      if (!last.m) { last.m = 's'; return; }
+    }
+    // aa ee oo -> â ê ô
+    if ('aeo'.includes(k) && last && last.b === k) {
+      if (last.m === 'c') { last.m = ''; W.locked = true; push(k); return; }
+      if (!last.m) { last.m = 'c'; return; }
+    }
+    // w -> ă ơ ư (và uo -> ươ)
+    if (k === 'w') {
+      if (last && last.w) { last.b = 'w'; last.m = ''; last.w = false; W.locked = true; return; }
+      const n = L.length;
+      for (let i = n - 2; i >= 0; i--) {
+        if (L[i].b === 'u' && L[i + 1].b === 'o' && !(i === 1 && L[0].b === 'q')) {
+          if (L[i].m === 'h' && L[i + 1].m === 'h') { L[i].m = ''; L[i + 1].m = ''; W.locked = true; push('w'); }
+          else { L[i].m = 'h'; L[i + 1].m = 'h'; }
+          return;
+        }
+      }
+      for (let i = n - 1; i >= 0; i--) {
+        const b = L[i].b;
+        if (b === 'a' || b === 'o' || b === 'u') {
+          let t = i;
+          if (b === 'a' && i > 0 && L[i - 1].b === 'u' && !(i - 1 === 1 && L[0].b === 'q')) t = i - 1;
+          const m = L[t].b === 'a' ? 'b' : 'h';
+          if (L[t].m === m) { L[t].m = ''; W.locked = true; push('w'); }
+          else L[t].m = m;
+          return;
+        }
+      }
+      L.push({b:'u', m:'h', u:up, w:true});
+      return;
+    }
+    push(k);
+  }
+
+  function redraw() {
+    const s = render();
+    ta.setRangeText(s, start, start + prevLen, 'end');
+    prevLen = s.length;
+  }
+
+  function insert(text) {
+    ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end');
+    reset();
+  }
+
+  function type(key) {
+    if (!vn || !/^[a-zA-Z]$/.test(key)) { insert(key); return; }
+    if (ta.selectionStart !== ta.selectionEnd) {
+      ta.setRangeText('', ta.selectionStart, ta.selectionEnd, 'end');
+      reset();
+    }
+    if (start < 0 || ta.selectionStart !== start + prevLen) { reset(); start = ta.selectionStart; }
+    feed(key);
+    redraw();
+  }
+
+  function back() {
+    if (ta.selectionStart !== ta.selectionEnd) {
+      ta.setRangeText('', ta.selectionStart, ta.selectionEnd, 'end');
+      reset(); return;
+    }
+    if (start >= 0 && ta.selectionStart === start + prevLen && W.L.length) {
+      W.L.pop();
+      if (!W.L.some(isV)) W.tone = 0;
+      redraw();
+      if (!W.L.length) reset();
+      return;
+    }
+    reset();
+    const p = ta.selectionStart;
+    if (p > 0) ta.setRangeText('', p - 1, p, 'end');
+  }
+
+  function resetAITouchBuffer() {
+    clearTimeout(aiTimer);
+    aiTimer = null;
+    touchBuffer = [];
+  }
+
+  function scheduleAIDecode() {
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(() => processAITouches(false), 700);
+  }
+
+  async function processAITouches(addTrailingSpace) {
+    clearTimeout(aiTimer);
+    aiTimer = null;
+    if (!touchBuffer.length) return;
+
+    const submittedTouches = touchBuffer;
+    touchBuffer = [];
+
+    try {
+      const response = await fetch('/api/decode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({touches: submittedTouches})
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      for (const char of data.decoded_word) {
+        if (char === ' ') insert(' ');
+        else if (/^[a-zA-Z]$/.test(char)) type(char);
+        else insert(char);
+      }
+      if (addTrailingSpace) insert(' ');
+    } catch (error) {
+      touchBuffer = submittedTouches.concat(touchBuffer);
+      document.getElementById('status').textContent = 'Không thể giải mã AI';
+      console.error(error);
+    }
+  }
+
+  function applyTelex(sequence) {
+    const savedWord = W;
+    const savedStart = start;
+    const savedPrevLen = prevLen;
+    reset();
+
+    let result = '';
+    for (const char of sequence) {
+      if (char === ' ') {
+        result += render() + ' ';
+        reset();
+      } else if (/^[a-zA-Z]$/.test(char)) {
+        feed(char);
+      } else {
+        result += render() + char;
+        reset();
+      }
+    }
+    result += render();
+
+    W = savedWord;
+    start = savedStart;
+    prevLen = savedPrevLen;
+    return result;
+  }
+
+  const keyboardPositions = {};
+  for (const [rowIndex, rowKeys] of ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'].entries()) {
+    const rowOffset = [0, 0.5, 1.5][rowIndex];
+    Array.from(rowKeys).forEach((key, index) => {
+      keyboardPositions[key] = {x: rowOffset + index, y: rowIndex};
+    });
+  }
+
+  function nearestKeyboardKey(x, y) {
+    return Object.entries(keyboardPositions).reduce((nearest, [key, position]) => {
+      const distance = Math.hypot(position.x - x, position.y - y);
+      return distance < nearest.distance ? {key, distance} : nearest;
+    }, {key: '', distance: Infinity}).key;
+  }
+
+  function makeNoisyInput(sequence, repeatRate, driftRate) {
+    const touches = [];
+    let noisySequence = '';
+    let group = 0;
+    let keyIndex = 0;
+    let repeatAccumulator = 0;
+    let driftAccumulator = 0;
+
+    for (const char of sequence) {
+      const key = char.toLowerCase();
+      const keyPosition = keyboardPositions[key];
+      let x = keyPosition ? keyPosition.x : 4.5;
+      const y = keyPosition ? keyPosition.y : 3.2;
+
+      if (keyPosition) {
+        driftAccumulator += driftRate;
+        if (driftAccumulator >= 100) {
+          driftAccumulator -= 100;
+          const direction = keyPosition.x > 8 ? -1 : keyPosition.x < 1 ? 1 : (keyIndex % 2 ? -1 : 1);
+          x += direction * 0.72;
+        }
+      }
+
+      const observedKey = keyPosition ? nearestKeyboardKey(x, y) : char;
+      noisySequence += observedKey;
+      touches.push({x, y, t: keyIndex * 200, key: observedKey, group});
+
+      if (keyPosition) {
+        repeatAccumulator += repeatRate;
+        if (repeatAccumulator >= 100) {
+          repeatAccumulator -= 100;
+          noisySequence += observedKey;
+          touches.push({x: x + 0.03, y: y + 0.03, t: keyIndex * 200 + 150, key: observedKey, group});
+        }
+      }
+
+      group++;
+      keyIndex++;
+    }
+
+    return {touches, noisySequence};
+  }
+
+  function createPreviewKeyboard(containerId) {
+    const container = document.getElementById(containerId);
+    for (const rowKeys of ['qwertyuiop', 'asdfghjkl', 'zxcvbnm']) {
+      const row = document.createElement('div');
+      row.className = 'preview-row';
+      for (const key of rowKeys) {
+        const keyElement = document.createElement('div');
+        keyElement.className = 'preview-key';
+        keyElement.dataset.key = key;
+        keyElement.textContent = key;
+        row.appendChild(keyElement);
+      }
+      container.appendChild(row);
+    }
+
+    const spaceRow = document.createElement('div');
+    spaceRow.className = 'preview-row';
+    const spaceKey = document.createElement('div');
+    spaceKey.className = 'preview-key space-key';
+    spaceKey.dataset.key = ' ';
+    spaceKey.textContent = 'SPACE';
+    spaceRow.appendChild(spaceKey);
+    container.appendChild(spaceRow);
+  }
+
+  function animatePreviewKey(containerId, key) {
+    const keys = Array.from(document.getElementById(containerId).querySelectorAll('.preview-key'));
+    const keyElement = keys.find(element => element.dataset.key === key);
+    if (!keyElement) return;
+    keyElement.classList.remove('pressed');
+    void keyElement.offsetWidth;
+    keyElement.classList.add('pressed');
+    setTimeout(() => keyElement.classList.remove('pressed'), 180);
+  }
+
+  async function compareKeyboards() {
+    const input = document.getElementById('compare-input').value;
+    const repeatRate = Number(document.getElementById('repeat-rate').value);
+    const runButton = document.getElementById('compare-run');
+    if (!input) {
+      document.getElementById('baseline-state').textContent = 'Hãy nhập chuỗi Telex cần thử.';
+      return;
+    }
+
+    runButton.disabled = true;
+    runButton.textContent = 'Đang xử lý...';
+    const baselineOutput = document.getElementById('baseline-output');
+    const integratedOutput = document.getElementById('integrated-output');
+    const baselineState = document.getElementById('baseline-state');
+    const integratedState = document.getElementById('integrated-state');
+    baselineOutput.textContent = '';
+    integratedOutput.textContent = '';
+    try {
+      const {touches, noisySequence} = makeNoisyInput(
+        input,
+        repeatRate,
+        Number(document.getElementById('drift-rate').value)
+      );
+      let receivedSequence = '';
+      baselineState.textContent = 'Đang nhập...';
+      integratedState.textContent = 'Đang nhận cùng chuỗi chạm...';
+
+      for (const touch of touches) {
+        animatePreviewKey('baseline-preview', touch.key);
+        animatePreviewKey('integrated-preview', touch.key);
+        receivedSequence += touch.key;
+        baselineOutput.textContent = applyTelex(receivedSequence);
+        integratedState.textContent = `Chuỗi chạm nhận được: ${receivedSequence}`;
+        await new Promise(resolve => setTimeout(resolve, 220));
+      }
+
+      baselineState.textContent = 'Đã nhập xong';
+      integratedState.textContent = 'Đang giải mã bằng Viterbi + N-gram...';
+      const response = await fetch('/api/decode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({touches})
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+
+      baselineOutput.textContent = applyTelex(noisySequence);
+      integratedOutput.textContent = applyTelex(data.decoded_word);
+      integratedState.textContent = 'Đã giải mã xong';
+    } catch (error) {
+      integratedState.textContent = error instanceof TypeError
+        ? 'Không kết nối được /api/decode. Hãy chạy Flask.'
+        : `API giải mã lỗi: ${error.message}`;
+      console.error(error);
+    } finally {
+      runButton.disabled = false;
+      runButton.textContent = 'Chạy so sánh';
+    }
+  }
+
+  createPreviewKeyboard('baseline-preview');
+  createPreviewKeyboard('integrated-preview');
+
+  // ----- Bàn phím ảo -----
+  const rows = [
+    ['1','2','3','4','5','6','7','8','9','0'],
+    ['q','w','e','r','t','y','u','i','o','p'],
+    ['a','s','d','f','g','h','j','k','l'],
+    ['shift','z','x','c','v','b','n','m','back'],
+    ['vn',',','space','.','?','enter']
+  ];
+  const LABELS = {shift:'Shift', back:'Xóa lùi', space:'Dấu cách', enter:'Xuống dòng', vn:'Bật tắt gõ tiếng Việt'};
+  const kb = document.getElementById('kb');
+  const btns = [];
+  rows.forEach((r, ri) => {
+    const d = document.createElement('div');
+    d.className = 'row' + (ri === 2 ? ' pad' : '');
+    r.forEach(k => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.k = k;
+      b.className = 'key' + (k.length > 1 ? ' fn ' + k : '');
+      if (LABELS[k]) b.setAttribute('aria-label', LABELS[k]);
+      d.appendChild(b); btns.push(b);
+    });
+    kb.appendChild(d);
+  });
+
+  const charOf = k => {
+    if (/^[a-z]$/.test(k)) return shift ? k.toUpperCase() : k;
+    if (shift && SHIFT_NUM[k]) return SHIFT_NUM[k];
+    return k;
+  };
+
+  function paint() {
+    btns.forEach(b => {
+      const k = b.dataset.k;
+      if (k === 'shift') { b.textContent = '⇧'; b.classList.toggle('on', shift > 0); b.classList.toggle('caps', shift === 2); }
+      else if (k === 'back') b.textContent = '⌫';
+      else if (k === 'space') b.textContent = '';
+      else if (k === 'enter') b.textContent = '↵';
+      else if (k === 'vn') { b.textContent = vn ? 'VN' : 'EN'; b.classList.toggle('on', vn); }
+      else b.textContent = charOf(k);
+    });
+    document.getElementById('status').textContent = vn
+      ? `Đang gõ: Tiếng Việt (Telex${aiMode ? ' + AI' : ''})`
+      : 'Đang gõ: Tiếng Anh';
+  }
+  paint();
+
+  const aiButton = document.getElementById('ai-mode');
+  const tremorButton = document.getElementById('tremor');
+
+  document.getElementById('repeat-rate').addEventListener('input', e => {
+    document.getElementById('repeat-value').textContent = `${e.target.value}%`;
+  });
+  document.getElementById('drift-rate').addEventListener('input', e => {
+    document.getElementById('drift-value').textContent = `${e.target.value}%`;
+  });
+  document.getElementById('compare-run').addEventListener('click', compareKeyboards);
+
+  aiButton.addEventListener('click', () => {
+    aiMode = !aiMode;
+    aiButton.textContent = aiMode ? 'AI: Bật' : 'AI: Tắt';
+    aiButton.classList.toggle('on', aiMode);
+    aiButton.setAttribute('aria-pressed', String(aiMode));
+    resetAITouchBuffer();
+    ta.focus({preventScroll:true});
+  });
+
+  tremorButton.addEventListener('click', () => {
+    simulateTremor = !simulateTremor;
+    tremorButton.textContent = simulateTremor ? 'Run tay' : 'Run tay: Tắt';
+    tremorButton.classList.toggle('on', simulateTremor);
+    tremorButton.setAttribute('aria-pressed', String(simulateTremor));
+  });
+
+  kb.addEventListener('pointerdown', e => e.preventDefault());
+  kb.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const k = b.dataset.k;
+    if (k === 'shift') { shift = (shift + 1) % 3; paint(); return; }
+    if (k === 'vn') { vn = !vn; reset(); paint(); ta.focus({preventScroll:true}); return; }
+    if (k === 'back') back();
+    else if (aiMode) {
+      if (k === 'enter') {
+        insert('\n');
+        resetAITouchBuffer();
+      } else {
+        const char = k === 'space' ? ' ' : charOf(k);
+        const group = nextTouchGroup++;
+        const keyPosition = keyboardPositions[char.toLowerCase()];
+        const x = keyPosition ? keyPosition.x : 4.5;
+        const y = keyPosition ? keyPosition.y : 3.2;
+        touchBuffer.push({x, y, t:Date.now(), key:char, group});
+
+        if (simulateTremor) {
+          setTimeout(() => {
+            if (!touchBuffer.some(touch => touch.group === group)) return;
+            touchBuffer.push({x:x + 0.03, y:y + 0.03, t:Date.now() + 150, key:char, group});
+            if (char === ' ') processAITouches(true);
+          }, 10);
+        } else if (char === ' ') {
+          processAITouches(true);
+        } else {
+          scheduleAIDecode();
+        }
+      }
+    } else {
+      if (k === 'enter') insert('\n');
+      else if (k === 'space') insert(' ');
+      else type(charOf(k));
+    }
+    if (shift === 1) { shift = 0; paint(); }
+    ta.focus({preventScroll:true});
+  });
+
+  // Bàn phím vật lý đi qua cùng bộ gõ
+  ta.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    if (e.key === 'Backspace') { e.preventDefault(); back(); }
+    else if (vn && /^[a-zA-Z]$/.test(e.key)) { e.preventDefault(); type(e.key); }
+    else if (e.key.length === 1 || e.key === 'Enter') reset();
+  });
+
+  document.getElementById('clear').addEventListener('click', () => {
+    ta.value = '';
+    reset();
+    resetAITouchBuffer();
+    ta.focus();
+  });
+  document.getElementById('copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(ta.value); }
+    catch { ta.select(); document.execCommand('copy'); }
+  });
+})();
+</script>
+</body>
+</html>
